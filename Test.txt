@@ -1,0 +1,26 @@
+# Replace with your actual values
+$tenantId = "<your-tenant-id>"
+$appId    = "<your-client-id>"
+$secret   = "<your-client-secret>"
+
+# Login with SPN
+$secPass = ConvertTo-SecureString $secret -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($appId, $secPass)
+Connect-AzAccount -ServicePrincipal -Tenant $tenantId -Credential $cred
+
+# 🔐 Get access token specifically for blob storage
+$token = (Get-AzAccessToken -ResourceUrl "https://storage.azure.com/").Token
+
+# 🔽 Set up blob info
+$storageAccount = "<yourstorageacct>"
+$container = "<yourcontainer>"
+$blobName = "<file.csv>"
+$destPath = "C:\Temp\$blobName"
+
+# 🔗 Full blob URL
+$blobUrl = "https://$storageAccount.blob.core.windows.net/$container/$blobName"
+
+# 📥 Download with AAD token
+Invoke-RestMethod -Uri $blobUrl `
+    -Headers @{ Authorization = "Bearer $token" } `
+    -OutFile $destPath
