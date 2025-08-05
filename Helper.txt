@@ -1,0 +1,45 @@
+# Connect first (ensure right scopes)
+# Connect-MgGraph -Scopes "User.Read.All", "Group.Read.All", "Directory.Read.All"
+
+$sequence = 0..3 + 40..42 + 40.449 + 45.49 + 5..9 + [char[]]([char]'a'..[char]'z')
+$OutputFileName = "UserLicenseGroupReport.csv"
+$AllLicensedUsers = 0
+
+foreach ($char in $sequence) {
+    $StartTime = Get-Date
+    Write-Output "Checking users starting with the UserPrincipalName of $char..."
+
+    $expression = "startsWith(userPrincipalName,'$char')"
+
+    # Get licensed users for this character
+    $Lines = Get-MgUser -All -Filter $expression -Property "DisplayName,UserPrincipalName,AssignedLicenses" |
+        Where-Object {
+            $_.AssignedLicenses -and $_.AssignedLicenses.SkuId -contains $skuId
+        } |
+        ForEach-Object {
+            $displayName = $_.DisplayName -replace ',', ''  # Remove commas to preserve CSV format
+            $upn = $_.UserPrincipalName
+
+            $groupFlags = ($Groups | ForEach-Object {
+                if ($GroupMemberships[$_.Id].userPrincipalName -contains $upn) { '1' } else { ';' }
+            }) -join ''
+
+            "$displayName,$upn,$groupFlags"
+        }
+
+    # Write to file if any lines generated
+    if ($Lines) {
+        $Lines | ForEach-Object {
+            $_.Replace("`r", "").Replace("`n", "") | Add-Content -Path $OutputFileName
+        }
+    }
+
+    # Count users with license in this batch
+    $NumberOfUsers = (Get-MgUser -All -Filter $expression -Property "AssignedLicenses" |
+        Where-Object { $_.AssignedLicenses.SkuId -contains $skuId }).Count
+
+    $AllLicensedUsers += $NumberOfUsers
+
+    $ElapsedTime = New-TimeSpan -Start $StartTime -End (Get-Date)
+    Write-Output "Iteration '$char' took $($ElapsedTime.Minutes) mins, $($ElapsedTime.Seconds) secs; $NumberOfUsers licensed users added to the report."
+}
