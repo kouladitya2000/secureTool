@@ -1,0 +1,25 @@
+$now = (Get-Date).ToUniversalTime()
+
+if ($now.Hour -eq 6 -and $now.Minute -ge 30) {
+    $startTime = (Get-Date -Hour 4 -Minute 0 -Second 0).ToUniversalTime()
+    $endTime   = $now
+}
+elseif ($now.Hour -eq 9 -and $now.Minute -ge 15) {
+    $startTime = (Get-Date -Hour 7 -Minute 0 -Second 0).ToUniversalTime()
+    $endTime   = $now
+}
+else {
+    $endTime = $now
+    $startTime = $endTime.AddHours(-2)
+}
+
+$query = @"
+let startTime = datetime($($startTime.ToString("yyyy-MM-dd HH:mm:ss"))Z);
+let endTime = datetime($($endTime.ToString("yyyy-MM-dd HH:mm:ss"))Z);
+FunctionAppLogs
+| where TimeGenerated between (startTime .. endTime)
+| extend CleanFunctionName = tostring(split(FunctionName, '-')[0])
+| summarize arg_max(TimeGenerated, *) by CleanFunctionName
+| sort by TimeGenerated desc 
+| project TimeGenerated, CleanFunctionName, ResultType, ResultDescription
+"@
