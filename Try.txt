@@ -1,0 +1,14 @@
+# 1. Convert results to HTML (keeps original column names dynamically)
+$resultHTMLString = $results | ConvertTo-Html -Fragment | Out-String
+
+# 2. Insert 4 non-breaking spaces (&nbsp;) after every column except the last in each row
+#    This ensures gaps between columns but not after the last column
+$resultHTMLString = $resultHTMLString -replace '(?<=</td>)(?=\s*<td)', '&nbsp;&nbsp;&nbsp;&nbsp;'
+
+# 3. Append extra details for the email body
+$resultHTMLString += "<br><p>Schedule: $text</p>"
+$resultHTMLString += "<p>Time Range: $startTime UTC -> $endTime UTC</p>"
+$resultHTMLString += "<br>Thanks<br>Azure Monitoring<br>This is a system generated email. Do not reply."
+
+# 4. Send the email
+Send-MailMessage -To $to -From $from -Subject $subject -BodyAsHtml $resultHTMLString -SmtpServer $smtp
